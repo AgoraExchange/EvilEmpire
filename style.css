@@ -40,6 +40,7 @@
 
   --tap-target: 52px; /* Comfortable thumb size */
   --nav-height: 74px; /* Bottom bar height (excl. safe inset) */
+  --top-nav-height: 82px;
 }
 
 /* Base reset (light touch) */
@@ -339,6 +340,9 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
+.editor__actions[aria-label="Save editor"] {
+  grid-template-columns: 1fr 1fr;
+}
 
 .btn {
   height: var(--tap-target);
@@ -404,7 +408,7 @@ body {
   list-style: none;
   margin: 0; padding: 8px 14px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   height: calc(var(--nav-height) - 12px);
   align-items: center;
@@ -449,6 +453,33 @@ body {
   font-size: 11px;
   letter-spacing: 0.2px;
   opacity: 0.85;
+}
+
+.app.nav-top .shell {
+  padding-top: calc(var(--safe-top) + var(--top-nav-height) + 8px);
+  padding-bottom: calc(var(--safe-bottom) + 18px);
+}
+.app.nav-top .bottombar {
+  top: 0;
+  bottom: auto;
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: 8px;
+  border-top: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  background:
+    linear-gradient(180deg, rgba(18,18,18,0.96) 0%, rgba(18,18,18,0.9) 70%, rgba(18,18,18,0.35) 100%),
+    #0f0f0f;
+}
+.app.nav-top .bottombar__list {
+  height: 62px;
+}
+.app.nav-top .topbar {
+  position: relative;
+  top: auto;
+}
+.app.nav-bottom .bottombar {
+  top: auto;
+  bottom: 0;
 }
 
 /* =========================================
@@ -539,6 +570,11 @@ body {
   color:var(--color-text);
   padding:6px 10px; border-radius:999px; font-size:12px
 }
+.chip.is-active {
+  border-color: rgba(0,255,255,0.55);
+  color: #eaffff;
+  box-shadow: 0 0 14px rgba(0,255,255,0.18);
+}
 
 .dir__grid{
   --cols: 2;
@@ -579,6 +615,28 @@ body {
 }
 .drop__form{display:grid; gap:12px}
 .drop__actions{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.drop__preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.drop__pill {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: var(--color-muted);
+  font-size: 12px;
+  max-width: 100%;
+  padding: 7px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drop__pill b {
+  color: var(--color-accent-b);
+  font-weight: 700;
+  margin-left: 6px;
+}
 
 /* =========================================
    Desktop + large screens
@@ -622,7 +680,7 @@ body {
    ========================================= */
 /* Will apply when JS adds a 'ready' or 'loaded' class after splash */
 .app.ready #splash { display: none !important; }
-.app.ready #shell { display: block; }
+.app.ready #shell { display: grid; }
 
 /* When delete modal is open, prevent background scroll (JS will toggle this) */
 .body--modal-open {
@@ -803,4 +861,26 @@ body {
   border-color: rgba(255,77,79,0.55);
   color: #ffd7d7;
   text-shadow: 0 0 8px rgba(255,77,79,0.4);
+}
+
+/* Final nav-position overrides */
+.app.nav-top .shell {
+  padding-top: calc(var(--safe-top) + var(--top-nav-height) + 10px);
+  padding-bottom: calc(var(--safe-bottom) + 18px);
+}
+.app.nav-top .bottombar {
+  top: 0;
+  bottom: auto;
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: 8px;
+  border-top: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.app.nav-bottom .shell {
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
+}
+.app.nav-bottom .bottombar {
+  top: auto;
+  bottom: 0;
 }

@@ -28,6 +28,7 @@
   const SPLASH_MS = 2500;
   const VAULT_KEY = 'evilEmpireVault';           // localStorage key for files
   const SPOT_KEY  = 'evilEmpireSpotlight';       // localStorage key for spotlight
+  const SETTINGS_KEY = 'evilEmpireSettings';      // localStorage key for app settings
   const MAX_TEXT_BYTES = 250_000;                // ~250 KB safety for localStorage demo
 
   // ---------- DOM helpers ----------
@@ -37,6 +38,7 @@
   // Regions / major nodes
   const appRoot = document.body; // class "app" already on <body>
   const splash = $('#splash');
+  const splashMotto = $('.splash__motto');
   const shell = $('#shell');
 
   const notifyRoot = $('#notify-root');
@@ -50,6 +52,7 @@
   const navEditor = $('#nav-editor');
   const navDirectory = $('#nav-directory');
   const navDropbox = $('#nav-dropbox');
+  const navSettings = $('#nav-settings');
 
   // Editor nodes
   const textarea = $('#editor-textarea');
@@ -57,6 +60,8 @@
   const btnCopy = $('#btn-copy');
   const btnPaste = $('#btn-paste');
   const btnDelete = $('#btn-delete');
+  const btnEditorUpload = $('#btn-editor-upload');
+  const editorUpload = $('#editor-upload');
   const langSlot = $('#editor-lang');
 
   // NEW: Save-from-Editor controls
@@ -68,6 +73,10 @@
   const saveNote = $('#save-note');
   const saveCancel = $('#save-cancel');
   const saveConfirm = $('#save-confirm');
+  const modalSettings = $('#modal-settings');
+  const settingNavPosition = $('#setting-nav-position');
+  const settingsClose = $('#settings-close');
+  const settingsSave = $('#settings-save');
 
   // Modal: Clear
   const modalClear = $('#modal-clear');
@@ -94,6 +103,7 @@
   const dropNote = $('#drop-note');
   const dropCategory = $('#drop-category');
   const dropFile = $('#drop-file');
+  const dropPreview = $('#drop-preview');
   const btnVault = $('#btn-vault');               // <button type="submit" id="btn-vault">
   const btnVaultBlank = $('#btn-vault-blank');    // <button type="button" id="btn-vault-blank">
 
@@ -108,10 +118,14 @@
   let VAULT = [];
   let SPOT = [];
   let spotDeleteMode = false; // Off by default
+  let dirFilter = 'All';
+  let SETTINGS = { navPosition: 'top' };
 
   // ---------- Splash sequencing ----------
   function boot() {
     if (!splash || !shell) return;
+    document.title = 'Evil Empire - Hacking all the way to the bank.';
+    if (splashMotto) splashMotto.textContent = '"Hacking all the way to the bank."';
     setTimeout(() => {
       splash.style.display = 'none';
       shell.hidden = false;
@@ -174,6 +188,54 @@
     navDropbox?.addEventListener('click', (e) => {
       e.preventDefault();
       activateTab('dropbox');
+    });
+    navSettings?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSettingsModal();
+    });
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      SETTINGS = raw ? { ...SETTINGS, ...JSON.parse(raw) } : SETTINGS;
+    } catch {
+      SETTINGS = { navPosition: 'top' };
+    }
+    if (!['top', 'bottom'].includes(SETTINGS.navPosition)) SETTINGS.navPosition = 'top';
+    applySettings();
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS));
+    } catch {
+      notify({ title: 'Settings not saved', msg: 'Browser storage rejected the change.', duration: 2200 });
+    }
+  }
+
+  function applySettings() {
+    appRoot.classList.toggle('nav-top', SETTINGS.navPosition === 'top');
+    appRoot.classList.toggle('nav-bottom', SETTINGS.navPosition === 'bottom');
+    if (settingNavPosition) settingNavPosition.value = SETTINGS.navPosition;
+  }
+
+  function openSettingsModal() {
+    applySettings();
+    openModal(modalSettings);
+  }
+
+  function wireSettings() {
+    settingsClose?.addEventListener('click', () => closeModal(modalSettings));
+    settingsSave?.addEventListener('click', () => {
+      SETTINGS.navPosition = settingNavPosition?.value || 'top';
+      applySettings();
+      saveSettings();
+      closeModal(modalSettings);
+      notify({ title: 'Settings saved', msg: `Navigation moved to ${SETTINGS.navPosition}.`, duration: 2000 });
+    });
+    modalSettings?.addEventListener('mousedown', (e) => {
+      if (e.target === modalSettings) closeModal(modalSettings);
     });
   }
 
@@ -338,9 +400,32 @@
     btnCopy?.addEventListener('click', onCopy);
     btnPaste?.addEventListener('click', onPaste);
     btnDelete?.addEventListener('click', onDelete);
+    btnEditorUpload?.addEventListener('click', () => editorUpload?.click());
+    editorUpload?.addEventListener('change', loadFileIntoEditor);
 
     // NEW: Save button opens Save modal
     btnSave?.addEventListener('click', openSaveModalPrefilled);
+  }
+
+  async function loadFileIntoEditor() {
+    const file = editorUpload?.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > MAX_TEXT_BYTES) {
+        notify({ title: 'File too large', msg: 'Load files under 250 KB into the editor.', duration: 2500 });
+        editorUpload.value = '';
+        return;
+      }
+      textarea.value = await readFileAsText(file);
+      ensureGutterLines();
+      updateLanguageHeuristic();
+      toast(`Loaded ${file.name}`);
+      notify({ title: 'Loaded in Editor', msg: file.name, duration: 2200 });
+    } catch {
+      notify({ title: 'Read failed', msg: 'This file could not be loaded as text.', duration: 2500 });
+    } finally {
+      if (editorUpload) editorUpload.value = '';
+    }
   }
 
   // ---------- Editor: copy/paste/delete ----------
@@ -421,6 +506,7 @@
       closeModal(modalClear);
       closeModal(fileModal);
       closeModal(modalSave); // NEW
+      closeModal(modalSettings);
     }
   }
 
@@ -442,7 +528,7 @@
     if (e.key !== 'Tab') return;
     const currentModal = !modalClear?.hidden
       ? modalClear
-      : (!fileModal?.hidden ? fileModal : (!modalSave?.hidden ? modalSave : null));
+      : (!fileModal?.hidden ? fileModal : (!modalSave?.hidden ? modalSave : (!modalSettings?.hidden ? modalSettings : null)));
     if (!currentModal) return;
     const focusables = getFocusable(currentModal);
     if (!focusables.length) return;
@@ -674,6 +760,7 @@
     VAULT.forEach(item => {
       const hay = `${item.name} ${item.cat} ${item.note || ''}`.toLowerCase();
       if (q && !hay.includes(q)) return;
+      if (dirFilter !== 'All' && item.cat !== dirFilter) return;
 
       const card = document.createElement('div');
       card.className = 'file-card';
@@ -700,6 +787,16 @@
 
   dirSearch?.addEventListener('input', renderDirectory);
 
+  function wireDirectory() {
+    $$('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        dirFilter = chip.dataset.cat || 'All';
+        $$('.chip').forEach(c => c.classList.toggle('is-active', c === chip));
+        renderDirectory();
+      });
+    });
+  }
+
   // ---------- DROPBOX: "Vault It" + "Vault From Editor" ----------
   function wireDropbox() {
     // Intercept form submit for "Vault It"
@@ -712,36 +809,73 @@
     btnVaultBlank?.addEventListener('click', async () => {
       await vaultFromEditor();
     });
+
+    dropFile?.addEventListener('change', renderDropPreview);
+  }
+
+  function renderDropPreview() {
+    if (!dropPreview) return;
+    const files = Array.from(dropFile?.files || []);
+    if (!files.length) {
+      dropPreview.innerHTML = '';
+      return;
+    }
+    const visible = files.slice(0, 8).map(file => {
+      const cat = classifyFile(file.name, '', file.type || '');
+      return `<span class="drop__pill">${escapeHTML(file.name)} <b>${escapeHTML(cat)}</b></span>`;
+    }).join('');
+    const more = files.length > 8 ? `<span class="drop__pill">+${files.length - 8} more</span>` : '';
+    dropPreview.innerHTML = visible + more;
   }
 
   async function vaultFromForm() {
     // Collect metadata
-    const name = (dropTitle?.value || '').trim() || inferFilename();
+    const title = (dropTitle?.value || '').trim();
     const note = (dropNote?.value || '').trim();
-    const cat = (dropCategory?.value || '').trim() || 'Hacking';
+    const selectedCat = (dropCategory?.value || '').trim();
+    const files = Array.from(dropFile?.files || []);
+
+    if (files.length) {
+      let saved = 0;
+      for (const file of files) {
+        const payload = { text: null, base64: null, mime: file.type || 'application/octet-stream' };
+        try {
+          if (file.size <= MAX_TEXT_BYTES) {
+            payload.text = await readFileAsText(file);
+          } else {
+            payload.base64 = await readFileAsBase64(file);
+          }
+          const cat = selectedCat && selectedCat !== 'Auto sort'
+            ? selectedCat
+            : classifyFile(file.name, payload.text || '', payload.mime);
+          const name = files.length === 1 && title ? title : file.name;
+          await finalizeVault({ name, note, cat, payload, stayOnPage: true, skipReset: true });
+          saved += 1;
+        } catch {
+          notify({ title: 'Read error', msg: `Could not read ${file.name}.`, duration: 2200 });
+        }
+      }
+      resetDropboxForm();
+      renderDropPreview();
+      activateTab('directory');
+      notify({ title: 'Autofiled', msg: `${saved} file${saved === 1 ? '' : 's'} saved to Directory.`, duration: 2400 });
+      return;
+    }
 
     let payload = { text: null, base64: null, mime: null };
-    const file = dropFile?.files?.[0];
-
-    if (file) {
-      payload.mime = file.type || 'application/octet-stream';
-      try {
-        if (file.size <= MAX_TEXT_BYTES) {
-          const text = await readFileAsText(file);
-          payload.text = text;
-        } else {
-          const b64 = await readFileAsBase64(file);
-          payload.base64 = b64;
-        }
-      } catch {
-        notify({ title: 'Read error', msg: 'Could not read uploaded file.', duration: 2200 });
-      }
-    } else if (textarea && textarea.value.trim().length) {
+    if (textarea && textarea.value.trim().length) {
       const text = textarea.value;
       payload.text = text.length <= MAX_TEXT_BYTES ? text : text.slice(0, MAX_TEXT_BYTES);
       payload.mime = 'text/plain;charset=utf-8';
     }
 
+    if (!payload.text && !payload.base64) {
+      notify({ title: 'Nothing to vault', msg: 'Choose files or add text in the editor.', duration: 2200 });
+      return;
+    }
+
+    const cat = selectedCat && selectedCat !== 'Auto sort' ? selectedCat : classifyFile(title || inferFilename(), payload.text || '', payload.mime);
+    const name = title || inferFilename();
     await finalizeVault({ name, note, cat, payload });
   }
 
@@ -753,7 +887,10 @@
     }
     const name = inferFilename();
     const note = (dropNote?.value || '').trim(); // optional carry-over
-    const cat = (dropCategory?.value || '').trim() || 'Hacking';
+    const selectedCat = (dropCategory?.value || '').trim();
+    const cat = selectedCat && selectedCat !== 'Auto sort'
+      ? selectedCat
+      : classifyFile(name, text, 'text/plain;charset=utf-8');
 
     const payload = {
       text: text.length <= MAX_TEXT_BYTES ? text : text.slice(0, MAX_TEXT_BYTES),
@@ -764,7 +901,7 @@
     await finalizeVault({ name, note, cat, payload });
   }
 
-  async function finalizeVault({ name, note, cat, payload }) {
+  async function finalizeVault({ name, note, cat, payload, stayOnPage = false, skipReset = false }) {
     const item = {
       id: uid(),
       name,
@@ -779,17 +916,52 @@
     saveVaultToStorage();
     renderDirectory();
 
-    notify({ title: 'Vaulted', msg: `"${name}" added to Directory.`, duration: 2200 });
+    if (!skipReset) notify({ title: 'Vaulted', msg: `"${name}" added to Directory.`, duration: 2200 });
     toast('Saved to vault');
 
     // Reset inputs
-    if (dropTitle) dropTitle.value = '';
-    if (dropNote) dropNote.value = '';
-    if (dropCategory) dropCategory.value = 'Hacking';
-    if (dropFile) dropFile.value = '';
+    if (!skipReset) resetDropboxForm();
 
     // Show the user the result
-    activateTab('directory');
+    if (!stayOnPage) activateTab('directory');
+  }
+
+  function resetDropboxForm() {
+    if (dropTitle) dropTitle.value = '';
+    if (dropNote) dropNote.value = '';
+    if (dropCategory) dropCategory.value = 'Auto sort';
+    if (dropFile) dropFile.value = '';
+  }
+
+  function classifyFile(name = '', text = '', mime = '') {
+    const lower = name.toLowerCase();
+    if (/\.(py|pyw)$/.test(lower)) return 'Python';
+    if (/\.(bat|cmd)$/.test(lower)) return 'Bat';
+    if (/\.ps1$/.test(lower)) return 'PowerShell';
+    if (/\.(js|mjs|cjs)$/.test(lower)) return 'JavaScript';
+    if (/\.(html|htm)$/.test(lower)) return 'HTML';
+    if (/\.json$/.test(lower)) return 'JSON';
+    if (/\.(sh|bash|zsh)$/.test(lower)) return 'Bash/Shell';
+    if (/\.(duck|ducky)$/.test(lower)) return 'BadUSB';
+    if (/\.txt$/.test(lower) && /\b(STRING |DELAY |GUI |CTRL |ALT |ENTER|REM )/i.test(text)) return 'BadUSB';
+    if (/\.sql$/.test(lower)) return 'SQL';
+    if (mime.includes('json')) return 'JSON';
+    return mapLangToCategory(detectLanguageName(text));
+  }
+
+  function detectLanguageName(text = '') {
+    const tests = [
+      { name: 'Python', re: /\b(def |import |from |elif|self\b|print\(|async\s+def|with |lambda )/ },
+      { name: 'PowerShell', re: /\b(Get-|Set-|New-|Write-Host|Import-Module|\$env:|\.ps1\b)/i },
+      { name: 'Batch (.bat)', re: /\b(@echo off|setlocal|endlocal|goto\s+:|\.bat\b|%\~\w)/i },
+      { name: 'Bash/Shell', re: /\b(#!\/bin\/bash|#!\/bin\/sh|#!\/usr\/bin\/env\s+bash|#!)/i },
+      { name: 'JavaScript', re: /\b(function\s+|=>|const\s+|let\s+|document\.|console\.|import\s+|export\s+)/ },
+      { name: 'HTML', re: /<\/?[a-z][\s\S]*>/i },
+      { name: 'JSON', re: /^\s*\{[\s\S]*\}\s*$/ },
+      { name: 'BadUSB (DuckyScript)', re: /\b(STRING |DELAY |GUI |CTRL |ALT |ENTER|REM )/i },
+      { name: 'SQL', re: /\b(SELECT |INSERT |UPDATE |DELETE |FROM |WHERE |JOIN )/i }
+    ];
+    return tests.find(t => t.re.test(text))?.name || 'Hacking';
   }
 
   function inferFilename() {
@@ -982,17 +1154,28 @@
 
   // ---------- Initialize ----------
   window.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
     wireNav();
     wireEditor();
     wireModal();
+    wireSettings();
     wireKeybinds();
     unlockTabs();
+    wireDirectory();
     wireDropbox();        // listens to #drop-form submit and #btn-vault-blank
     wireSpotlight();      // Spotlight add/toggle/delete
     loadVaultFromStorage();
     renderDirectory();
     loadSpotFromStorage();
     renderSpotlight();
+    registerServiceWorker();
     boot();
   });
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Local file previews cannot register service workers; hosted PWA mode can.
+    });
+  }
 })();

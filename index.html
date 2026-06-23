@@ -12,12 +12,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <!-- Styles -->
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="style.css" />
 
   <!-- Touch icon placeholders (can be replaced later) -->
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
 <body class="app" data-theme="dark">
   <!-- =========================================
@@ -142,6 +142,14 @@
 
         <!-- NEW: Save button group (added without changing existing structure) -->
         <div class="editor__actions" role="group" aria-label="Save editor">
+          <input id="editor-upload" class="visually-hidden" type="file" accept=".txt,.py,.bat,.cmd,.ps1,.js,.html,.css,.json,.xml,.sql,.sh,.md,.csv,text/*" />
+          <button type="button" class="btn btn--ghost" id="btn-editor-upload" aria-label="Load a file into editor">
+            <!-- Inline SVG: upload -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v3H5v-3z"/>
+            </svg>
+            <span class="btn__text">Upload</span>
+          </button>
           <button type="button" class="btn" id="btn-save" aria-haspopup="dialog" aria-controls="modal-save">
             <!-- Inline SVG: save/disk -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -177,7 +185,7 @@
               <input id="dir-search" type="search" placeholder="Search by name or category…" />
             </label>
             <div class="dir__chips" aria-label="Quick categories">
-              <button class="chip" data-cat="All" type="button">All</button>
+              <button class="chip is-active" data-cat="All" type="button">All</button>
               <button class="chip" data-cat="Python" type="button">Python</button>
               <button class="chip" data-cat="Bat" type="button">Bat</button>
               <button class="chip" data-cat="PowerShell" type="button">PowerShell</button>
@@ -226,20 +234,25 @@
             <label class="input">
               <span class="input__label">Category</span>
               <select id="drop-category">
-                <option value="" disabled selected>Select a category</option>
+                <option selected>Auto sort</option>
                 <option>Python</option>
                 <option>Bat</option>
                 <option>PowerShell</option>
                 <option>BadUSB</option>
                 <option>Hacking</option>
+                <option>JavaScript</option>
+                <option>HTML</option>
+                <option>JSON</option>
+                <option>Bash/Shell</option>
               </select>
             </label>
 
             <label class="input">
-              <span class="input__label">Upload file</span>
-              <input id="drop-file" type="file" />
-              <small class="hint">Plain text is best; code files auto-detected when possible.</small>
+              <span class="input__label">Upload files</span>
+              <input id="drop-file" type="file" multiple />
+              <small class="hint">Select one or many files. Auto sort groups scripts by type.</small>
             </label>
+            <div id="drop-preview" class="drop__preview" aria-live="polite"></div>
 
             <div class="drop__actions">
               <button type="submit" class="btn btn--ghost" id="btn-vault">Vault It</button>
@@ -346,6 +359,24 @@
               <path d="M12 4a6 6 0 00-6 6 4 4 0 000 8h11a4 4 0 000-8 6 6 0 00-5-6zm1 7h3l-4-4-4 4h3v5h2v-5z" />
             </svg>
             <span class="bottombar__label">Dropbox</span>
+          </button>
+        </li>
+
+        <!-- Settings -->
+        <li role="presentation">
+          <button
+            id="nav-settings"
+            class="bottombar__btn"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="modal-settings"
+            title="Settings"
+          >
+            <!-- Inline SVG: settings -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.4 13.5a7.8 7.8 0 000-3l2-1.5-2-3.4-2.4 1a8 8 0 00-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 007 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 000 3l-2 1.5 2 3.4 2.4-1a8 8 0 002.6 1.5l.4 2.6h4l.4-2.6a8 8 0 002.6-1.5l2.4 1 2-3.4-2-1.5zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z" />
+            </svg>
+            <span class="bottombar__label">Settings</span>
           </button>
         </li>
       </ul>
@@ -468,6 +499,35 @@
       </div>
     </div>
     <!-- ===== /Save-from-Editor modal ===== -->
+
+    <!-- Settings modal -->
+    <div
+      id="modal-settings"
+      class="modal modal--settings"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-settings-title"
+      hidden
+    >
+      <div class="modal__card">
+        <header class="modal__header">
+          <h2 id="modal-settings-title" class="modal__title">Settings</h2>
+        </header>
+        <div class="modal__body">
+          <label class="input">
+            <span class="input__label">Navigation position</span>
+            <select id="setting-nav-position">
+              <option value="top">Top dock</option>
+              <option value="bottom">Bottom dock</option>
+            </select>
+          </label>
+        </div>
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--ghost" id="settings-close">Close</button>
+          <button type="button" class="btn" id="settings-save">Save</button>
+        </footer>
+      </div>
+    </div>
   </div>
 
   <!-- =========================================
