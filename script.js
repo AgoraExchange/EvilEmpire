@@ -120,6 +120,7 @@
   let spotDeleteMode = false; // Off by default
   let dirFilter = 'All';
   let SETTINGS = { navPosition: 'top' };
+  let activeVaultId = null;
 
   // ---------- Splash sequencing ----------
   function boot() {
@@ -417,6 +418,7 @@
         return;
       }
       textarea.value = await readFileAsText(file);
+      activeVaultId = null;
       ensureGutterLines();
       updateLanguageHeuristic();
       toast(`Loaded ${file.name}`);
@@ -550,6 +552,7 @@
     modalCancel?.addEventListener('click', () => closeModal(modalClear));
     modalConfirm?.addEventListener('click', () => {
       textarea.value = '';
+      activeVaultId = null;
       ensureGutterLines();
       updateLanguageHeuristic();
       closeModal(modalClear);
@@ -576,6 +579,7 @@
       }
       if (typeof item.text === 'string') {
         textarea.value = item.text;
+        activeVaultId = item.id;
         ensureGutterLines();
         updateLanguageHeuristic();
         activateTab('editor');
@@ -620,6 +624,7 @@
       const id = fileModal?.dataset?.fileId;
       if (!id) return;
       VAULT = VAULT.filter(f => f.id !== id);
+      if (activeVaultId === id) activeVaultId = null;
       saveVaultToStorage();
       renderDirectory();
       closeModal(fileModal);
@@ -641,10 +646,11 @@
       notify({ title: 'Nothing to save', msg: 'Editor is empty.', duration: 2000 });
       return;
     }
-    // Prefill filename + category based on heuristic
-    saveTitle.value = inferFilename();
-    saveCategory.value = mapLangToCategory(langSlot?.textContent || '');
-    saveNote.value = '';
+    const activeItem = activeVaultId ? VAULT.find(f => f.id === activeVaultId) : null;
+    // Prefill from the active Directory file when editing, otherwise infer a new file.
+    saveTitle.value = activeItem?.name || inferFilename();
+    saveCategory.value = activeItem?.cat || mapLangToCategory(langSlot?.textContent || '');
+    saveNote.value = activeItem?.note || '';
     openModal(modalSave);
   }
 
@@ -679,9 +685,40 @@
       mime: 'text/plain;charset=utf-8'
     };
 
-    finalizeVault({ name, note, cat, payload }).then(() => {
+    const activeItem = activeVaultId ? VAULT.find(f => f.id === activeVaultId) : null;
+    const saveTask = activeItem
+      ? updateVaultItem(activeItem.id, { name, note, cat, payload })
+      : finalizeVault({ name, note, cat, payload });
+
+    saveTask.then(() => {
       closeModal(modalSave);
     });
+  }
+
+  async function updateVaultItem(id, { name, note, cat, payload }) {
+    const index = VAULT.findIndex(f => f.id === id);
+    if (index === -1) {
+      activeVaultId = null;
+      notify({ title: 'Original missing', msg: 'Saving this as a new file instead.', duration: 2400 });
+      return finalizeVault({ name, note, cat, payload });
+    }
+
+    VAULT[index] = {
+      ...VAULT[index],
+      name,
+      cat,
+      note,
+      mime: payload.mime || VAULT[index].mime || 'text/plain;charset=utf-8',
+      text: payload.text,
+      base64: null,
+      updatedAt: Date.now()
+    };
+
+    activeVaultId = id;
+    saveVaultToStorage();
+    renderDirectory();
+    toast('File updated');
+    notify({ title: 'Updated', msg: `"${name}" saved in Directory.`, duration: 2200 });
   }
 
   // ---------- Language heuristic ----------
@@ -829,6 +866,7 @@
   }
 
   async function vaultFromForm() {
+    activeVaultId = null;
     // Collect metadata
     const title = (dropTitle?.value || '').trim();
     const note = (dropNote?.value || '').trim();
@@ -857,6 +895,7 @@
       }
       resetDropboxForm();
       renderDropPreview();
+      activeVaultId = null;
       activateTab('directory');
       notify({ title: 'Autofiled', msg: `${saved} file${saved === 1 ? '' : 's'} saved to Directory.`, duration: 2400 });
       return;
@@ -899,6 +938,7 @@
     };
 
     await finalizeVault({ name, note, cat, payload });
+    activeVaultId = VAULT[0]?.id || null;
   }
 
   async function finalizeVault({ name, note, cat, payload, stayOnPage = false, skipReset = false }) {
@@ -913,6 +953,7 @@
     if (payload.base64 !== null) item.base64 = payload.base64;
 
     VAULT.unshift(item);
+    activeVaultId = item.id;
     saveVaultToStorage();
     renderDirectory();
 

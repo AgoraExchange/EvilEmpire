@@ -406,12 +406,15 @@ body {
 
 .bottombar__list {
   list-style: none;
-  margin: 0; padding: 8px 14px;
+  margin: 0; padding: 8px 10px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   height: calc(var(--nav-height) - 12px);
   align-items: center;
+}
+.bottombar__list > li {
+  min-width: 0;
 }
 
 .bottombar__btn {
@@ -453,6 +456,10 @@ body {
   font-size: 11px;
   letter-spacing: 0.2px;
   opacity: 0.85;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app.nav-top .shell {
@@ -480,6 +487,48 @@ body {
 .app.nav-bottom .bottombar {
   top: auto;
   bottom: 0;
+}
+
+/* Four-button mobile nav fit guard */
+.bottombar__list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.bottombar__list > li,
+.bottombar__btn,
+.bottombar__label {
+  min-width: 0;
+}
+
+@media (max-width: 430px) {
+  .bottombar__list {
+    gap: 6px;
+    padding-left: max(8px, var(--safe-left));
+    padding-right: max(8px, var(--safe-right));
+  }
+  .bottombar__btn {
+    height: 54px;
+    border-radius: 12px;
+    gap: 2px;
+  }
+  .bottombar__btn .icon {
+    width: 19px;
+    height: 19px;
+  }
+  .bottombar__label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 340px) {
+  .bottombar__list {
+    gap: 5px;
+  }
+  .bottombar__label {
+    font-size: 0;
+  }
+  .bottombar__btn {
+    grid-template-rows: 1fr;
+  }
 }
 
 /* =========================================
